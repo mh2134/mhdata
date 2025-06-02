@@ -1,0 +1,681 @@
+---
+title: "Emotion Video Analysis Material - Affective Computing Course"
+author: "Manuel Ninaus"
+date: "2024-12-06"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Video Data analysis 
+
+## General information
+Reminder: We have 16 adult participants watching 5 videos while their faces were recorded using a webcam.    
+Participants watched 1 positive videos, 1 disgust video, 1 sad video, and 2 neutral videos.  
+
+You will have directly access to data from 1 participant (5 files/videos).
+below the files will be named = video_id
+below the files will the person in front of the camera will be stored in variable = participant_id 
+
+All videos were supposed to be recorded with 30 frames per second. 
+
+In total we should have 80 videos. However one person only submitted 1 instead of 2 neutral videos. = 79 videos.
+As the *neutral videos* were the same it should not matter for further data analysis - We shall focus on "neutral1" videos, if you are going to use neutral videos.
+
+These videos were analysed using the *iMotions* software using the *AFFDEX* algorithm. 
+The AFFDEX algorithm tries to detect the different action units in the faces of the participants and calculates an intensity value for each action unit. Based on the intensities the algorithm then tries to predict whether a particular emotions is present and with which intensity. *!!This intensity values does not reflect the intensity of the emotion.!!* The value can be rather interpreted as a probability-like value of the presence of a particular emotion (i.e. the detected basic emotions). It is the probability that a human rater would also judge this expression as emotion X.  
+
+
+## Data preparation
+We are going to start with reading in the available data.
+We know the structure of the data and make use of it by already specifying new columns (id and condition) that can be extracted from the filename
+
+**Specify first with setwd() the folder where your data are stored (R users)**
+If you have the data in the same folder as the .Rmd File it should find the correct .csv files without specifying the folder as it takes automatically the folder where the .Rmd File is. I had the data files in a folder within the folder where the .Rmd File was. so I specified the path to the folder directly again with setwd  (i.e. data_adapted).
+```{r, warning=FALSE, message=FALSE}
+#setwd("C:/Users/ninausma/Desktop/data_WS2024AffComp_v2/data_adapted") #this is an option to indicate where the csv files are. 
+setwd("C:/Users/zmugm1/Downloads/Data-20241226/Data")
+
+
+library(tidyverse)
+library(purrr)
+
+
+file_list <- list.files(pattern = "*.csv", full.names = TRUE) # this command looks for csv files working directory
+df_raw <- map_df(file_list, ~{
+  # read in the csv file
+  data <- read_csv(.x, show_col_types = FALSE) #Specify the column types or set `show_col_types = FALSE` to quiet this message
+  
+  # extract the id and condition from the file name
+  file_name <- str_split(.x, "_", simplify = TRUE, n = 3)#[3] # extracting file name n = 3 = Maximum number of pieces to return / naming conventions was suboptimal "_"
+
+  video_id <- file_name[1]
+  condition <- file_name[3]
+  condition <- file_name[3]
+  participant_id <- file_name[2]
+  video_id <- str_extract(file_name, "\\d+")[1] #any digit (\\d) and at least 1 (+)
+  condition <- str_extract(file_name, "[^\\_]+")[3] #regular expression ^ matches anything but the provided characters. In this case "_". In other words this part of the code uses the str_extract function to extract a sequence of characters from the   file_name <- str_split(.x, "_", simplify = TRUE, n = 3)#[3] # extracting file name n = 3 = Maximum number of pieces to return / naming conventions was suboptimal "_"
+
+  video_id <- file_name[1]
+  condition <- file_name[3]
+  participant_id <- file_name[2]
+  video_id <- str_extract(file_name, "\\d+")[1] #any digit (\\d) and at least 1 (+)
+  condition <- str_extract(file_name, "[^\\_]+")[3] #regular expression ^ matches anything but the provided characters. In this case "_". In other words this part of the code uses the str_extract function to extract a sequence of characters from the file_name. The pattern "[^\.]+" specifies that the extracted sequence should consist of one or more characters that are not a "_" . In other words, it captures everything in the file name until it encounters a dot.
+  ## add the video_id and condition as additional columns
+  data %>%
+    dplyr::mutate(video_id = video_id, condition = condition, participant_id = participant_id)
+})
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+
+
+#df_raw$Row <- 1:nrow(df_raw)
+#str(df_raw)
+#print(colnames(df_raw))
+#View(head(df, 100))
+
+df_raw <- df_raw %>%
+  relocate(video_id, condition, participant_id, .after = Row)
+#df_raw <- df_raw %>%
+#  relocate(video_id, .before = participant_id)
+#df_raw <- df_raw %>%
+#  relocate(condition, .before = participant_id)
+df_raw$video_id <- as.factor(df_raw$video_id)
+df_raw$condition <- as.factor(df_raw$condition)
+df_raw$participant_id <- as.factor(df_raw$participant_id)
+#df_raw$participant_id <- as.factor(as.numeric(df_raw$participant_id))
+#dropping some variables and very basic data cleaning
+#str(df_raw)
+#view(df_raw)
+#colnames(df)
+
+df <- subset(df_raw, select=-c(EventSource...4, SlideEvent, StimType,Duration,CollectionPhase, SourceStimuliName, EventSource...10))
+df <- df[!is.na(df$SampleNumber),] #remove NA sample Numbers
+df <- df[(df$Timestamp > 0),]
+```
+
+This is how our dataframe currently looks.  BTW I had to rename several files manually because you did not adhere to your own naming conventions :( 
+
+For each participant (id) we have several thousand entries (rows) per watched video which correspond the acquired frames in each video. 
+Further, we can see for each emotion a value displayed. This is the "intensity" as calculated by the AFFDEX algorithm (Affectiva) we used in iMotions. **This value indicates the likelihood that human coders would classify this expression as emotion X**
+
+```{r}
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+  # read in the csv file
+  data1 <- read_csv("C:/Users/zmugm1/Downloads/Data-20241226/Output Files/preprocessed_behavioral_data_complete.csv", show_col_types = FALSE) 
+
+show(data1)
+
+```
+
+## Data cleaning
+### Checking sample/frame numbers/
+For this course, we need to make some shortcuts in terms of data cleaning.
+
+First lets check, whether we really have participants that have too few samples which might imply technical difficulties (e.g. recording issues, wrong sampling rate(Hz))
+
+I am also removing here the "neutral2" condition as it will not be relevant further on. You can look at it separately or if you want it for another analysis! 
+
+Lets look first at the *samples for the sad video*.
+```{r}
+library(dplyr)
+
+sample_counts_happy <- df[df$condition == "happy", ] %>% 
+  group_by(video_id, condition, participant_id) %>% 
+  summarise(n_samples = max(SampleNumber), .groups = "drop") %>% 
+  arrange(desc(n_samples))
+View(sample_counts_happy)
+
+sample_counts_sad <- df[df$condition == "sad", ] %>% 
+  group_by(video_id, condition, participant_id) %>% 
+  summarise(n_samples = max(SampleNumber), .groups = "drop") %>% 
+  arrange(desc(n_samples))
+View(sample_counts_sad)
+
+sample_counts_disgust <- df[df$condition == "disgust", ] %>% 
+  group_by(video_id, condition, participant_id) %>% 
+  summarise(n_samples = max(SampleNumber), .groups = "drop") %>% 
+  arrange(desc(n_samples))
+View(sample_counts_disgust)
+
+sample_counts_neutral <- df[df$condition=="neutral1",] %>% 
+  group_by(video_id, condition, participant_id) %>% 
+  summarise(n_samples = max(SampleNumber), .groups = "drop") %>% 
+  arrange(desc(n_samples))
+View(sample_counts_neutral)
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+
+#df <- df[df$condition != "neutral1_",]
+df <- df[df$condition != "neutral2_",]
+
+# Calculate number of samples per video
+# sample_counts <- df %>% 
+#   group_by(video_id, condition) %>% 
+#   summarise(n_samples = max(SampleNumber))
+# sample_counts
+
+# Calculate number of samples per video per condition
+sample_counts_sad <- df[df$condition=="sad",] %>% 
+  group_by(video_id, condition, participant_id) %>% 
+  summarise(n_samples = max(SampleNumber))
+
+```
+*samples for the happy video*
+```{r, warning=FALSE, message=FALSE}
+sample_counts_happy <- df[df$condition=="happy",] %>% 
+  group_by(video_id, condition) %>% 
+  summarise(n_samples = max(SampleNumber))
+sample_counts_happy
+```
+*samples for the disgust video*.
+```{r, warning=FALSE, message=FALSE}
+sample_counts_disgust <- df[df$condition=="disgust",] %>% 
+  group_by(video_id, condition) %>% 
+  summarise(n_samples = max(SampleNumber))
+sample_counts_disgust
+
+```
+*samples for the neutral 1 video*
+```{r, warning=FALSE, message=FALSE}
+sample_counts_neutral <- df[df$condition=="neutral1",] %>% 
+  group_by(video_id, condition) %>% 
+  summarise(n_samples = max(SampleNumber))
+sample_counts_neutral
+
+```
+
+
+
+It seems that at least for the sad video there were some differences in cutting the video as some videos had more than 1000 less frames than the average. It really seems it was the "cutting" of the video rather than the sampling frequency. So good job for sampling ...not such a good jo fur cutting the videos :( 
+That is, these sad video have way frames than all other participants/videos in sad There are ways to correct for that by downsampling all other data to the least number of samples. This would mean we would, however, lots of information....also it is more complicated. For this course we need shortcuts. That is, we delete participants with (very) few frames, i.e. way less frames than the others. 
+The idea is now to get every video to the same  number of frames, as this makes it way easier for the next steps. IMPORTANT THIS IS A SHORTCUT for this course! you should NOT do this for a proper analysis.
+
+I tried to find the lowest number of samples per condition that is not too far away from all other video samples.
+That means:
+sad = 6633 frames
+happy = 3630 frames
+disgust 3609 frames
+neutral = 1781 frames
+
+(Check the tables above to better understand that step and the number of frames)
+
+### Removing participants
+
+```{r, warning=FALSE, message=FALSE}
+#check number of samples
+library(dplyr)
+# Filter out participants with having issues cutting the sad videos (more than than 1000 samples less[7000-1000]=6000)
+filtered_ids <- sample_counts_sad %>% 
+  filter(n_samples <= 6000) %>% 
+  pull(video_id)
+filtered_ids
+
+df_filtered <- df %>%
+  filter(!video_id %in% filtered_ids)
+df_filtered
+```
+
+We can see now that we got rid of videos with too few samples.  
+
+
+### Number of samples 
+For this demo below, where we mainly focus on descriptive data and visualization of the data, we need to make some shortcuts as to not make it too complicated.  
+
+For that we need to bring all participants to the same number of samples, because this will make visualization **MUCH** easier. For your statistical analysis you dont need to do this- at least I would not recommend in case you would  loose many data points doing this. You can instead create another data frame here. But it seams that the frame differences between individuals are for this purpose mostly negligible (AGAIN A SHORTCUT FOR THIS COURSE). BUT don't forget we already dropped 2 disgust videos completely!  
+
+Here we remove frames above 6633 frames (sad), 3630 frames (happy), 3609 frames (disgust), 1781 frames (neutral)  for each participant. That should do the trick **BUT** it is nothing that I would recommend in general.(ONLY IMPORTANT FOR DATA VISUALIZATION )
+
+```{r, warning=FALSE, message=FALSE}
+# Remove frames above 6633 frames (sad), 3630 frames (happy), 3609 frames (disgust), 1781 frames (neutral)  for each participant
+
+df_filtered <- df_filtered %>%
+  group_by(video_id, condition) %>%
+  filter(case_when(
+    condition == "sad" & SampleNumber <= 6633 ~ TRUE,
+    condition == "happy" & SampleNumber <= 3569 ~ TRUE,#3569,3630
+    condition == "disgust" & SampleNumber <= 3609 ~ TRUE,
+    condition == "neutral1" & SampleNumber <= 1781 ~ TRUE,
+    TRUE ~ FALSE
+  )) %>%
+  ungroup()
+
+```
+
+Lets check whether we did everything correctly. we should have the same number of samples for each video per condition. 
+
+```{r,warning=FALSE, message=FALSE}
+sample_counts_filtered <- df_filtered %>% 
+  group_by(video_id, condition, participant_id) %>% 
+  summarise(n_samples = max(SampleNumber))
+sample_counts_filtered
+```
+
+
+```{r}
+# DataFrames über participant_code (data1) und participant_id (df) zusammenführen
+unique_values <- unique(df_filtered$participant_id)
+print(unique_values)
+unique_values1 <- unique(data1$participant_code)
+print(unique_values1)
+
+df_merged <- df_filtered %>%
+  mutate(participant_id = str_to_lower(participant_id)) %>%
+  inner_join(
+    data1 %>% mutate(participant_code = str_to_lower(participant_code)),
+    by = c("participant_id" = "participant_code")
+  )
+
+colnames(df_merged)
+# Zeige die ersten Zeilen des zusammengeführten DataFrames an
+View(head(df_merged, 20))
+
+every_100th_row <- df_merged[seq(1, nrow(df_merged), by = 1000), ]
+View(every_100th_row)
+
+df_grouped <- df_merged %>%
+  mutate(openness_group = case_when(
+    openness < 3  ~ "low",
+    openness >= 3.5  ~ "high",
+    TRUE          ~ "medium"
+  )) %>%
+  select(participant_id, openness, openness_group) %>%
+  distinct() %>% arrange(openness)
+
+view(df_grouped) 
+```
+**Looks good!**
+
+## Data aggregation
+
+Now lets proceed.
+
+Lets first aggregate the data to get a different perspective on the data. 
+We will create 2 data frames (mean & median values). For that you COULD use the full data set without removing any frames/ids/students BUT this means it will be hard to compare it with the visualizations. So we will proceed here with the filtered data frame (df_filtered)
+
+dataframe df_agg_mean (see below) can be used for e.g. data analysis. = Mean
+dataframe df_agg_md (see below) can be used for e.g. data analysis. = Median
+other ideas?
+
+ For this here I only focused on the basic emotions available. You can just replace below the columns you are interested in or add more column names 
+### Mean 
+
+```{r, message=FALSE}
+#df_agg_mean <- df_filtered %>%
+df_agg_mean <- df_merged %>%
+  group_by(participant_id, condition) %>%
+  summarise(across(c(Joy, Anger, Contempt, Disgust, Fear, Sadness, Surprise, Engagement, Confusion, Sentimentality , Neutral, Valence), mean)) # here we specficy the columns we want to have the "mean" for
+#write_csv(df_agg_mean, "aggregated_data/table_aggregated_emotion_mean.csv")
+df_agg_mean
+
+```
+
+### Median
+
+```{r,warning=FALSE, message=FALSE}
+#df_agg_md <- df_filtered %>%
+df_agg_md <- df_merged %>%
+  group_by(participant_id, condition) %>%
+  summarise(across(c(Joy, Anger, Contempt, Disgust, Fear, Sadness, Surprise, Engagement, Confusion, Neutral, Valence), median))
+#write_csv(df_agg_md, "aggregated_data/Table_aggregated_emotion_median.csv")
+df_agg_md
+```
+### Dataframe comparison
+I created one dataframe with mean values and one with median values.
+
+What can you quickly see?
+
+
+## Visualisations
+```{r}
+View(df_filtered)
+```
+
+In any case, lets proceed to visualizing some of the data. 
+
+
+This code should create a line plot with separate lines for each emotion, colored according to the scale_color_discrete() function. The x-axis should show the time variable, and the y-axis should show the mean intensity of each emotion at each time point. The plot is also facetted by condition and emotion, with the y-axis scaled to 0-100 to make comparisons easier.
+Remember for visualization we are currently using the filtered data (removed videos with low samples)
+```{r}
+view(head(df_merged, 20))
+
+df_long <- df_merged %>% 
+#df_long <- df_filtered %>%  #I just subselect some of the emotions we have available
+  gather(emotion, value, Anger, Contempt, Disgust, Fear, Joy, Sadness, Surprise, Sentimentality, Confusion)
+
+
+library(ggplot2)
+
+
+
+# Aggregate the data by time, emotion, and condition, and calculate the mean intensity
+df_time <- df_long %>%
+  group_by(SampleNumber, emotion, condition) %>%
+  summarise(mean_intensity = mean(value, na.rm = TRUE))
+
+
+# # Plot the mean intensity of each emotion over time, facetted by condition
+# ggplot(df_time, aes(x = SampleNumber, y = mean_intensity, color = emotion)) +
+#   geom_line() +
+#   labs(x = "Time", y = "Mean Intensity") +
+#   scale_color_discrete(name = "Emotion") +
+#   ylim(0, 100) +
+#   facet_grid(rows = vars(emotion), cols = vars(condition), scales = "free_y")
+
+
+
+ggplot(df_time, aes(x = SampleNumber, y = mean_intensity, color = emotion)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Emotion") +
+  facet_wrap(~condition, nrow = 4, scales = "free_y")  # Dynamische Y-Achsen-Skalierung
+
+
+```
+lets now look just at the more general  indicators such as engagement, neutral, blink, and maybe attention
+```{r}
+df_time1 <- df_merged %>%
+  group_by(SampleNumber, participant_id, condition) %>%
+  summarise(mean_intensity = mean(Sadness, na.rm = TRUE))
+
+df_time1 <- df_merged %>%
+  mutate(openness_group = case_when(
+    openness < 3   ~ "low",
+    openness >= 3.5 ~ "high",
+    TRUE           ~ "medium"
+  )) %>%
+  #participant_id, 
+  group_by(SampleNumber, condition, openness_group) %>%
+  summarise(mean_intensity = mean(Surprise, na.rm = TRUE), .groups = "drop")
+
+ggplot(df_time1, aes(x = SampleNumber, y = mean_intensity, color = openness_group)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Openness Group") +
+  facet_wrap(~condition,  scales = "free_y")  # Dynamische Y-Achsen-Skalierung
+
+
+df_time2 <- df_merged  %>%
+  mutate(openness_group = case_when(
+    openness < 3   ~ "low",
+    openness >= 3.5 ~ "high",
+    TRUE           ~ "medium"
+  )) %>% 
+#df_long <- df_filtered %>%  #I just subselect some of the emotions we have available
+  gather(emotion, value, Anger, Contempt, Disgust, Fear, Joy, Sadness, Surprise, Sentimentality, Confusion, Valence)%>%
+  filter( condition == 'disgust' )%>% #happy disgust neutral1 sad
+  #participant_id, 
+  group_by(SampleNumber, condition, openness_group, emotion) %>%
+  summarise(mean_intensity = mean(value, na.rm = TRUE), .groups = "drop")
+
+ggplot(df_time2, aes(x = SampleNumber, y = mean_intensity, color = openness_group)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Openness Group") +
+  facet_wrap(~emotion,  nrow=10, scales = "free_y")  # Dynamische Y-Achsen-Skalierung
+
+
+emotions1 <- c("Anger", "Contempt", "Disgust", "Fear", "Joy")   # Beispiel: die ersten 5
+emotions2 <- c("Sadness", "Surprise", "Sentimentality", "Confusion", "Valence")  # Beispiel: die anderen
+
+df_time2_plot1 <- df_time2 %>% filter(emotion %in% emotions1)
+df_time2_plot2 <- df_time2 %>% filter(emotion %in% emotions2)
+
+ggplot(df_time2_plot1, aes(x = SampleNumber, y = mean_intensity, color = openness_group)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Openness Group") +
+  facet_wrap(~emotion, ncol = 1, scales = "free_y")
+```
+
+```{r}
+df_participant <- df_merged %>%
+  group_by(participant_id) %>%
+  summarise(openness = mean(openness, na.rm = TRUE)) %>%
+  mutate(openness_group = case_when(
+    openness < 3    ~ "low",
+    openness >= 3.5 ~ "high",
+    TRUE            ~ "medium"
+  ))
+
+df_emotions <- df_merged %>%
+  gather(emotion, value, Anger, Contempt, Disgust, Fear, Joy, Sadness, Surprise, Sentimentality, Confusion, Valence) %>%
+  # Falls du nur eine bestimmte Condition (z.B. "disgust") betrachten möchtest, kannst du hier filtern:
+  #group_by(participant_id, condition, emotion) %>%
+  #summarise(mean_intensity = mean(value, na.rm = TRUE), .groups = "drop")
+
+df_summary <- df_emotions %>%
+  left_join(df_participant, by = "participant_id")
+
+view(df_summary)
+
+library(broom)
+library(purrr)
+
+# Für jede Kombination aus Offenheitsgruppe, Emotion und Condition wird ein Korrelations-Test zwischen mean_intensity und openness durchgeführt.
+corr_results <- df_summary %>%
+  group_by(openness_group, emotion, condition) %>%
+  summarise(
+    # Falls pro Gruppe mehrere Teilnehmer vorhanden sind, führe den Korrelations-Test durch.
+    test = list(if(n() > 1) cor.test(emotion(value), openness) else NA),
+    .groups = "drop"
+  ) %>%
+  # Verwende broom::tidy, um Testergebnisse in Tabellenform zu überführen. 
+  mutate (tidy_test = map(test, ~ if(is.list(.x)) broom::tidy(.x) else tibble(estimate = NA_real_, p.value = NA_real_))) %>%
+  unnest(tidy_test) %>%
+  select(openness_group, emotion, condition, estimate, p.value)
+
+print(corr_results)
+
+```
+
+
+
+
+
+```{r}
+df_long_main <- df_filtered %>%  #I just subselect some of the emotions we have available
+  gather(emotion, value, Engagement, Neutral, Attention, Blink)
+
+library(ggplot2)
+
+# Aggregate the data by time, emotion, and condition, and calculate the mean intensity
+df_time_main <- df_long_main %>%
+  group_by(SampleNumber, emotion, condition) %>%
+  summarise(mean_intensity = mean(value, na.rm = TRUE))
+
+# Plot the mean intensity of each emotion over time, facetted by condition
+ggplot(df_time_main, aes(x = SampleNumber, y = mean_intensity, color = emotion)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Emotion") +
+  ylim(0, 100) +
+  facet_grid(rows = vars(emotion), cols = vars(condition), scales = "free_y")
+
+```
+Just valence? Important for valence we need to consider that we can have negative values. that is why we need to adjust the limits of the y axis in the visualization =  ylim(-100, 100) 
+
+Look at the temporal dynamic. Really interesting descriptive pattern. Do you see what I mean?
+
+```{r}
+df_long_val <- df_filtered %>%  #I just subselect some of the emotions we have available
+  gather(emotion, value, Valence)
+
+library(ggplot2)
+
+# Aggregate the data by time, emotion, and condition, and calculate the mean intensity
+df_time_val <- df_long_val %>%
+  group_by(SampleNumber, emotion, condition) %>%
+  summarise(mean_intensity = mean(value, na.rm = TRUE))
+
+# Plot the mean intensity of each emotion over time, facetted by condition
+ggplot(df_time_val, aes(x = SampleNumber, y = mean_intensity, color = emotion)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Emotion") +
+  ylim(-100, 100) +
+  facet_grid(rows = vars(emotion), cols = vars(condition), scales = "free_y")
+```
+
+
+### Quick overview
+now lets get back to the basic emotions and different visualizations.#
+littel hard to see with all the emotions. maybe if you go through the script play around with the colours or numbers of emotions displayed at once.
+
+```{r}
+ggplot(df_time, aes(x = SampleNumber, y = mean_intensity, color = emotion)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Emotion") +
+  ylim(0, 100) +
+  facet_wrap(~ condition, ncol = 2)
+
+```
+Now let's look at the emotions over time in greater detail per video. 
+
+### Sad Video  
+First for the sad condition, i.e. participants watched Ralph talking about his life - 
+lets plot it separately for each condition
+
+sad plot
+```{r}
+plot_condition <- function(condition) {
+  ggplot(df_time[df_time$condition == condition, ], aes(x = SampleNumber, y = mean_intensity, color = emotion)) +
+    geom_line() +
+    ggtitle(paste("Emotions over time for", condition, "condition")) +
+    xlab("Time") +
+    ylab("Probability (of shown emotion)") +
+    scale_color_manual(values = c("brown", "red", "green", "orange", "purple", "blue", "grey", "black", "yellow")) +
+    theme_bw() + ylim(0,100) + 
+    theme(legend.position = "bottom")
+}
+
+#library(gridExtra)
+# combine the plots into a single grid with 2 columns
+#grid.arrange(grobs = plots, ncol = 2)
+
+# create a list of plots for each condition
+plots <- lapply(unique(df$condition), plot_condition)
+plots[[1]] 
+```
+
+### Neutral Video 
+neutral video
+```{r}
+plots[[3]] 
+```
+### Happy Video
+happy video
+```{r}
+plots[[4]] 
+```
+
+### Disgust Video 
+disgust video
+```{r}
+plots[[5]] 
+```
+
+
+### Emotion Intensity per participant
+Do all participants feel the same way?
+
+Lets look at the values per person
+
+```{r}
+library(ggplot2)
+
+df_agg2 <- df_long %>%
+  group_by(participant_id, condition, emotion) %>%
+  summarise(mean_intensity = mean(value, na.rm = T))
+
+ggplot(df_agg2, aes(x = participant_id, y = mean_intensity, fill = emotion)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(rows = vars(condition)) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+```
+
+We can nicely see that this methods does not seem to be working for every participants or that the videos just didn't not elicit the intended emotion. 
+
+
+## Downsampling 
+Now with lower temporal resolution by downsampling using rolling mean.
+
+This code calculates the rolling mean of mean_intensity for each emotion and condition, using a window size of 300 (10 seconds) and centering the result. It then removes any rows with missing values, and plots the rolling mean of each emotion over time, facetted by condition. The y-axis range is limited to 0-100 as before.
+
+```{r}
+# Calculate the rolling mean for each emotion and condition
+library(zoo)
+df_smooth <- df_time %>%
+  group_by(emotion, condition) %>%
+  mutate(mean_smooth = rollmean(mean_intensity, k = 300, align = "center", fill = NA)) %>%   #300 = 300 frames = original video with 30 frames per second
+  na.omit()
+
+# Plot the rolling mean of each emotion over time, facetted by condition
+ggplot(df_smooth, aes(x = SampleNumber, y = mean_smooth, color = emotion)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Smoothed Intensity") +
+  scale_color_discrete(name = "Emotion") +
+  ylim(0, 100) +
+  facet_grid(rows = vars(emotion), cols = vars(condition), scales = "free_y")
+```
+
+## Conclusion
+Effectively we can see that the happy video worked quite well, while the sad video did not elicit strong facial responses and disgust was very diverse.
+so lets focus on the end maybe on the "intended" emotion for each video. 
+
+```{r}
+ggplot(df_time %>% filter(emotion == "Joy"), aes(x = SampleNumber, y = mean_intensity, color = emotion)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Emotion") +
+  ylim(0, 100) +
+  facet_wrap(~ condition, scales = "free")
+
+ggplot(df_time %>% filter(emotion == "Disgust"), aes(x = SampleNumber, y = mean_intensity, color = emotion)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Emotion") +
+  ylim(0, 100) +
+  facet_wrap(~ condition, scales = "free")
+
+ggplot(df_time %>% filter(emotion == "Sadness"), aes(x = SampleNumber, y = mean_intensity, color = emotion)) +
+  geom_line() +
+  labs(x = "Time", y = "Mean Intensity") +
+  scale_color_discrete(name = "Emotion") +
+  ylim(0, 100) +
+  facet_wrap(~ condition, scales = "free")
+
+
+```
+
+## Warnings
+Now we have quite a good overview of the data.
+Please note that the current data cleaning process was a quick and dirty solution to get to some nice visualisations. This helps to get a feel for these kind of data, especially if they are new to you.
+
+## Perspective
+One possible way of analysing the data is to threshold the data and, for instance, say that you only want to consider emotions displayed in a frame if they are more intense  than a certain threshold (e.g. 50).
+You can then count how many frames are above 50 for each emotion and then run e.g. a chi squared test to check for differences between two videos in terms of the frequency of an emotion displayed. There are many possibilites ...
+
+
